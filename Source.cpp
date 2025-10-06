@@ -262,33 +262,30 @@ int main(int argc, char* argv[])
 			window.draw(line, 2, sf::Lines);
 		}
 
+
+		// sort rays of a light source based on their angle
 		std::sort(light.RayLines.begin(), light.RayLines.end(), 
 			[](const std::shared_ptr<RayLight>& a, const std::shared_ptr<RayLight>& b)
 			{return a->angle < b->angle;});
-		// draw a default light source
-		float pos0X = light.RayLines[0]->source.x;
-		float pos0Y = light.RayLines[0]->source.y;
-		float pos1X = light.RayLines[0]->getVisibleEndPos().x;
-		float pos1Y = light.RayLines[0]->getVisibleEndPos().y;
-		float pos2X = light.RayLines[1]->getVisibleEndPos().x;
-		float pos2Y = light.RayLines[1]->getVisibleEndPos().y;
-		sf::VertexArray triangle(sf::Triangles, 3);
-		{
-			triangle[0] = sf::Vertex(sf::Vector2f(pos0X, pos0Y), sf::Color::Yellow);
-			triangle[1] = sf::Vertex(sf::Vector2f(pos1X, pos1Y), sf::Color::Yellow);
-			triangle[2] = sf::Vertex(sf::Vector2f(pos2X, pos2Y), sf::Color::Yellow);
 
-		};
-		window.draw(triangle);
-
-		for (int i = 1; i < light.RayLines.size() ; i++)
+		// draw the rays of a light source
+		for (int i = 0; i < light.RayLines.size() ; i++)
 		{
+			int j = 0;
 			float pos0X = light.RayLines[i]->source.x;
 			float pos0Y = light.RayLines[i]->source.y;
 			float pos1X = light.RayLines[i]->getVisibleEndPos().x;
 			float pos1Y = light.RayLines[i]->getVisibleEndPos().y;
-			float pos2X = light.RayLines[i+1]->getVisibleEndPos().x;
-			float pos2Y = light.RayLines[i+1]->getVisibleEndPos().y;
+			if (i + 1 == light.RayLines.size())
+			{
+
+			}
+			else
+			{
+				j = i + 1;
+			}
+			float pos2X = light.RayLines[j]->getVisibleEndPos().x;
+			float pos2Y = light.RayLines[j]->getVisibleEndPos().y;
 
 			
 			sf::VertexArray triangle(sf::Triangles, 3);
@@ -300,6 +297,15 @@ int main(int argc, char* argv[])
 			};
 			window.draw(triangle);
 		}
+
+		// draw a light source
+		sf::CircleShape LightPoint;
+		LightPoint.setRadius(5);
+		LightPoint.setOrigin(5, 5);
+		LightPoint.setPosition(light.RayLines[0]->source.x, light.RayLines[0]->source.y);
+		LightPoint.setFillColor(sf::Color::Red);
+
+		window.draw(LightPoint);
 		
 		window.display();
 	}
