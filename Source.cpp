@@ -23,10 +23,9 @@ public:
 		return Vec2(x - rhs.x, y - rhs.y);
 	}
 
-	void add(const Vec2& rhs)
+	float length() const
 	{
-		x += rhs.x;
-		y += rhs.y;
+		return sqrtf(x * x + y * y);
 	}
 
 };
@@ -57,23 +56,31 @@ public:
 	float angle  = 0.0;
 	// how far a ray of light can reach
 	int length = 1500;
-
+	float visibleLength = length;
 	Line r;
 
 
 	RayLight() {}
-	RayLight(Vec2 start, float a)
+	RayLight(Vec2 start, float a, int l)
 		: source(start)
 		, angle(a)
+		, length(l)
 	{
 
 	}
 
-	const Line& getRay() 
+	// return invisible ending point
+	const Vec2& getEndPos() const
 	{
-		// define a ray as a line segment
-		r = Line(Vec2(source.x, source.y), Vec2(length*cos(angle), length * sin(angle)));
-		return r;
+		Vec2  end = { source.x + length * cos(angle), source.y + length * sin(angle) };
+		return end;
+	}
+
+	// return visible ending point
+	const Vec2& getVisibleEndPos() const
+	{
+		Vec2  end = { source.x + visibleLength * cos(angle), source.y + visibleLength * sin(angle) };
+		return end;
 	}
 };
 
@@ -81,7 +88,7 @@ public:
 class LightSource
 {
 	float Pi = 3.14159265359;
-	int numberOfRays = 10;
+	int numberOfRays = 20;
 	Vec2 sourcePos = { 400, 350 };
 
 public:
@@ -95,25 +102,25 @@ public:
 	float Theta = 2 * Pi / numberOfRays;
 
 	std::shared_ptr<RayLight> r;
-	std::vector<std::shared_ptr<RayLight>> Rays;
+	std::vector<std::shared_ptr<RayLight>> RayLines;
 
 	void createLight()
 	{
 		for (int i = 1; i <= numberOfRays; i++)
 		{
-			r = std::make_shared<RayLight>(sourcePos, Theta*i);
-			Rays.push_back(r);
+			r = std::make_shared<RayLight>(sourcePos, Theta*i, 1500);
+			RayLines.push_back(r);
 		}
 	}
 
 	void update(const Vec2& sourcePos)
 	{
-		for (auto a : Rays)
+		for (auto a : RayLines)
 		{
 			a->source.x = sourcePos.x;
 			a->source.y = sourcePos.y;
-		}
 
+		}
 	}
 };
 
@@ -171,7 +178,6 @@ int main(int argc, char* argv[])
 	light.createLight();
 
 
-
 	const std::string& FileName = "Data/Blocks.txt";
 	std::ifstream fin(FileName);
 
@@ -187,18 +193,13 @@ int main(int argc, char* argv[])
 			startY = endY;
 		}
 	}
-	// END of data extraction
-
-	Vec2 a(1, 4), b(4, 1), c(1, 1), d(4, 4);
-	bool isIt = LineIntersect(a, b, c, d).result;
-	Vec2 point = LineIntersect(a, b, c, d).pos;
-	std::cout << isIt << " the point is in " << "(" << point.x << "," << point.y << ")" << std::endl;
 
 	// draw a window
 	const int wWidth = 800;
 	const int wHight = 700;
 	sf::RenderWindow window(sf::VideoMode(wWidth, wHight), "SFML works!");
 	window.setFramerateLimit(60);
+
 
 
 
@@ -218,11 +219,36 @@ int main(int argc, char* argv[])
 				float mmy = event.mouseMove.y;
 				light.update({ mmx, mmy });
 			}
-
-
 		}
 
-		
+
+		// Implementation of intersection between light and blocks
+		for (auto& l : light.RayLines)
+		{
+			l->visibleLength = l->length;
+			Vec2 a = { l->source.x, l->source.y };
+			Vec2 b = { l->getEndPos().x, l->getEndPos().y};
+
+			for (auto& s : blocks)
+			{
+				Vec2 c = { s->startPoint.x, s->startPoint.y };
+				Vec2 d = { s->endPos.x, s->endPos.y };
+
+				bool isIt = LineIntersect(a, b, c, d).result;
+				Vec2 point = LineIntersect(a, b, c, d).pos;
+
+				if (isIt)
+				{
+					Vec2 len = { point.x - l->source.x, point.y - l->source.y };
+					if (len.length() < l->visibleLength)
+					{
+						l->visibleLength = len.length();
+					}
+				}
+			}
+		}
+
+		//std::cout << blocks.size() << std::endl;
 
 		window.clear();
 		// draw blocks in the window
@@ -237,13 +263,13 @@ int main(int argc, char* argv[])
 		}
 
 		// draw a default light source
-		for (auto& a : light.Rays)
+		for (auto& a : light.RayLines)
 		{
 			sf::Vertex line[]
 			{
 			
-				sf::Vertex(sf::Vector2f(a->getRay().startPoint.x, 	a->getRay().startPoint.y), sf::Color::Yellow),
-				sf::Vertex(sf::Vector2f(a->getRay().endPos.x, 	a->getRay().endPos.y), sf::Color::Yellow)
+				sf::Vertex(sf::Vector2f(a->source.x, a->source.y), sf::Color::Yellow),
+				sf::Vertex(sf::Vector2f(a->getVisibleEndPos().x, a->getVisibleEndPos().y), sf::Color::Yellow)
 			};
 			window.draw(line, 2, sf::Lines);
 		}
