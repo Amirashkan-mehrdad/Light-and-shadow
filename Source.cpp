@@ -53,7 +53,15 @@ public:
 	// define source of the light and the angle of its ray
 	// the angle is in radian
 	Vec2  source = { 0,0 };
+	// return visibile main ending point, which a ray light reflected on a corner
+	Vec2 endPoint = { 0,0 };
 	float angle  = 0.0;
+	// corrected angle
+	float Cangle = 0.0;
+	// It helps to classify the rays that are reflected on one corner
+	// There are 3 rays. one of them direct to the corner, the other two with a
+	// very little angle more or less than the direct one
+	int index = 0;
 	// how far a ray of light can reach
 	int length = 1500;
 	float visibleLength = length;
@@ -61,9 +69,12 @@ public:
 
 
 	RayLight() {}
-	RayLight(Vec2 start, float a, int l)
+	RayLight(Vec2 start, Vec2 end, float a, int i, int l)
 		: source(start)
+		, endPoint(end)
 		, angle(a)
+		, index(i)
+		, Cangle(i + a)
 		, length(l)
 	{
 
@@ -72,14 +83,14 @@ public:
 	// return invisible ending point
 	const Vec2& getEndPos() const
 	{
-		Vec2  end = { source.x + length * cos(angle), source.y + length * sin(angle) };
+		Vec2  end = { source.x + length * cos(Cangle), source.y + length * sin(Cangle) };
 		return end;
 	}
 
 	// return visible ending point
 	const Vec2& getVisibleEndPos() const
 	{
-		Vec2  end = { source.x + visibleLength * cos(angle), source.y + visibleLength * sin(angle) };
+		Vec2  end = { source.x + visibleLength * cos(Cangle), source.y + visibleLength * sin(Cangle) };
 		return end;
 	}
 };
@@ -87,29 +98,33 @@ public:
 // creat a light source with its rays
 class LightSource
 {
-	float Pi = 3.14159265359;
-	int numberOfRays = 20;
-	Vec2 sourcePos = { 400, 350 };
+	Vec2 sourcePos = { 0, 0 };
+	std::vector<std::shared_ptr<Line>> vertices = { nullptr };
 
 public:
 	LightSource() {}
-	LightSource(Vec2 start, int n)
+	LightSource(Vec2 start, std::vector<std::shared_ptr<Line>> vertices)
 		: sourcePos(start)
-		, numberOfRays(n)
+		, vertices(vertices)
 	{
 
 	}
-	float Theta = 2 * Pi / numberOfRays;
+	
 
 	std::shared_ptr<RayLight> r;
 	std::vector<std::shared_ptr<RayLight>> RayLines;
 
 	void createLight()
 	{
-		for (int i = 1; i <= numberOfRays; i++)
+		for (int i = 0; i < vertices.size(); i++)
 		{
-			r = std::make_shared<RayLight>(sourcePos, Theta*i, 1500);
-			RayLines.push_back(r);
+			Vec2 EndPoint = { vertices[i]->startPoint.x, vertices[i]->startPoint.y };
+			float Theta = atan2f(EndPoint.y - sourcePos.y, EndPoint.x - sourcePos.x);
+			for (int j = -1; j < 2; j++)
+			{
+				r = std::make_shared<RayLight>(sourcePos, EndPoint, Theta, j, 1500);
+				RayLines.push_back(r);
+			}
 		}
 	}
 
@@ -119,7 +134,8 @@ public:
 		{
 			a->source.x = sourcePos.x;
 			a->source.y = sourcePos.y;
-
+			a->angle = atan2f(a->endPoint.y - sourcePos.y, a->endPoint.x - sourcePos.x);
+			a->Cangle = a->angle + 0.0001 * a->index;
 		}
 	}
 };
@@ -174,9 +190,6 @@ int main(int argc, char* argv[])
 	std::shared_ptr<Line> l;
 	std::vector<std::shared_ptr<Line>> blocks;
 
-	LightSource light;
-	light.createLight();
-
 
 	const std::string& FileName = "Data/Blocks.txt";
 	std::ifstream fin(FileName);
@@ -193,6 +206,9 @@ int main(int argc, char* argv[])
 			startY = endY;
 		}
 	}
+
+	LightSource light({ 400, 350 }, blocks);
+	light.createLight();
 
 	// draw a window
 	const int wWidth = 800;
@@ -266,7 +282,7 @@ int main(int argc, char* argv[])
 		// sort rays of a light source based on their angle
 		std::sort(light.RayLines.begin(), light.RayLines.end(), 
 			[](const std::shared_ptr<RayLight>& a, const std::shared_ptr<RayLight>& b)
-			{return a->angle < b->angle;});
+			{return a->Cangle < b->Cangle;});
 
 		// draw the rays of a light source
 		for (int i = 0; i < light.RayLines.size() ; i++)
@@ -293,7 +309,6 @@ int main(int argc, char* argv[])
 				triangle[0] = sf::Vertex(sf::Vector2f(pos0X, pos0Y), sf::Color::Yellow);
 				triangle[1] = sf::Vertex(sf::Vector2f(pos1X, pos1Y), sf::Color::Yellow);
 				triangle[2] = sf::Vertex(sf::Vector2f(pos2X, pos2Y), sf::Color::Yellow);
-			
 			};
 			window.draw(triangle);
 		}
@@ -306,7 +321,6 @@ int main(int argc, char* argv[])
 		LightPoint.setFillColor(sf::Color::Red);
 
 		window.draw(LightPoint);
-		
 		window.display();
 	}
 }
